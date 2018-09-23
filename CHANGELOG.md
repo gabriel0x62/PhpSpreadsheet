@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 - Whitelist `tsv` extension when opening CSV files [#429](https://github.com/PHPOffice/PhpSpreadsheet/issues/429)
 - Fix a SUMIF warning with some versions of PHP when having different length of arrays provided as input [#873](https://github.com/PHPOffice/PhpSpreadsheet/pull/873)
 - Fix incorrectly handled backslash-escaped space characters in number format
+- Fixed conditional formatting for BIFF file format - [#841](https://github.com/PHPOffice/PHPExcel/issues/841)
 
 ## [1.7.0] - 2019-05-26
 
