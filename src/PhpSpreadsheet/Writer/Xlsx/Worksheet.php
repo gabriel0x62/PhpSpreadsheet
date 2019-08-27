@@ -463,6 +463,7 @@ class Worksheet extends WriterPart
     {
         // Conditional id
         $id = 1;
+        $arrConditional = [];
 
         // Loop through styles in the current worksheet
         foreach ($pSheet->getConditionalStylesCollection() as $cellCoordinate => $conditionalStyles) {
@@ -472,62 +473,83 @@ class Worksheet extends WriterPart
                 //    continue;
                 // }
                 if ($conditional->getConditionType() != Conditional::CONDITION_NONE) {
-                    // conditionalFormatting
-                    $objWriter->startElement('conditionalFormatting');
-                    $objWriter->writeAttribute('sqref', $cellCoordinate);
+                    $hash = $conditional->getHashCode();
 
-                    // cfRule
-                    $objWriter->startElement('cfRule');
-                    $objWriter->writeAttribute('type', $conditional->getConditionType());
-                    $objWriter->writeAttribute('dxfId', $this->getParentWriter()->getStylesConditionalHashTable()->getIndexForHashCode($conditional->getHashCode()));
-                    $objWriter->writeAttribute('priority', $id++);
-
-                    if (($conditional->getConditionType() == Conditional::CONDITION_CELLIS || $conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT)
-                        && $conditional->getOperatorType() != Conditional::OPERATOR_NONE) {
-                        $objWriter->writeAttribute('operator', $conditional->getOperatorType());
+                    if (!array_key_exists($hash, $arrConditional)) {
+                        $arrConditional[$hash] = [
+                            'rule' => $conditional,
+                            'cells' => [],
+                        ];
                     }
 
-                    if ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
-                        && $conditional->getText() !== null) {
-                        $objWriter->writeAttribute('text', $conditional->getText());
-                    }
-
-                    if ($conditional->getStopIfTrue()) {
-                        $objWriter->writeAttribute('stopIfTrue', '1');
-                    }
-
-                    if ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
-                        && $conditional->getOperatorType() == Conditional::OPERATOR_CONTAINSTEXT
-                        && $conditional->getText() !== null) {
-                        $objWriter->writeElement('formula', 'NOT(ISERROR(SEARCH("' . $conditional->getText() . '",' . $cellCoordinate . ')))');
-                    } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
-                        && $conditional->getOperatorType() == Conditional::OPERATOR_BEGINSWITH
-                        && $conditional->getText() !== null) {
-                        $objWriter->writeElement('formula', 'LEFT(' . $cellCoordinate . ',' . strlen($conditional->getText()) . ')="' . $conditional->getText() . '"');
-                    } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
-                        && $conditional->getOperatorType() == Conditional::OPERATOR_ENDSWITH
-                        && $conditional->getText() !== null) {
-                        $objWriter->writeElement('formula', 'RIGHT(' . $cellCoordinate . ',' . strlen($conditional->getText()) . ')="' . $conditional->getText() . '"');
-                    } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
-                        && $conditional->getOperatorType() == Conditional::OPERATOR_NOTCONTAINS
-                        && $conditional->getText() !== null) {
-                        $objWriter->writeElement('formula', 'ISERROR(SEARCH("' . $conditional->getText() . '",' . $cellCoordinate . '))');
-                    } elseif ($conditional->getConditionType() == Conditional::CONDITION_CELLIS
-                        || $conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
-                        || $conditional->getConditionType() == Conditional::CONDITION_EXPRESSION) {
-                        foreach ($conditional->getConditions() as $formula) {
-                            // Formula
-                            $objWriter->writeElement('formula', $formula);
-                        }
-                    } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSBLANKS) {
-                        // formula copied from ms xlsx xml source file
-                        $objWriter->writeElement('formula', 'LEN(TRIM(' . $cellCoordinate . '))=0');
-                    }
-
-                    $objWriter->endElement();
-
-                    $objWriter->endElement();
+                    $arrConditional[$hash]['cells'][$cellCoordinate] = '';
                 }
+            }
+        }
+
+        foreach ($arrConditional as $conditionalMap) {
+            $ranges = array_keys(Coordinate::mergeRangesInCollection($conditionalMap['cells']));
+
+            $conditional = $conditionalMap['rule'];
+
+            foreach ($ranges as $range) {
+                // conditionalFormatting
+                $objWriter->startElement('conditionalFormatting');
+                $objWriter->writeAttribute('sqref', $range);
+
+                $cellCoordinate = Coordinate::splitRange($range)[0];
+
+                // cfRule
+                $objWriter->startElement('cfRule');
+                $objWriter->writeAttribute('type', $conditional->getConditionType());
+                $objWriter->writeAttribute('dxfId', $this->getParentWriter()->getStylesConditionalHashTable()->getIndexForHashCode($conditional->getHashCode()));
+                $objWriter->writeAttribute('priority', $id++);
+
+                if (($conditional->getConditionType() == Conditional::CONDITION_CELLIS || $conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT)
+                    && $conditional->getOperatorType() != Conditional::OPERATOR_NONE) {
+                    $objWriter->writeAttribute('operator', $conditional->getOperatorType());
+                }
+
+                if ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
+                    && $conditional->getText() !== null) {
+                    $objWriter->writeAttribute('text', $conditional->getText());
+                }
+
+                if ($conditional->getStopIfTrue()) {
+                    $objWriter->writeAttribute('stopIfTrue', '1');
+                }
+
+                if ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
+                    && $conditional->getOperatorType() == Conditional::OPERATOR_CONTAINSTEXT
+                    && $conditional->getText() !== null) {
+                    $objWriter->writeElement('formula', 'NOT(ISERROR(SEARCH("' . $conditional->getText() . '",' . $cellCoordinate . ')))');
+                } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
+                    && $conditional->getOperatorType() == Conditional::OPERATOR_BEGINSWITH
+                    && $conditional->getText() !== null) {
+                    $objWriter->writeElement('formula', 'LEFT(' . $cellCoordinate . ',' . strlen($conditional->getText()) . ')="' . $conditional->getText() . '"');
+                } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
+                    && $conditional->getOperatorType() == Conditional::OPERATOR_ENDSWITH
+                    && $conditional->getText() !== null) {
+                    $objWriter->writeElement('formula', 'RIGHT(' . $cellCoordinate . ',' . strlen($conditional->getText()) . ')="' . $conditional->getText() . '"');
+                } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
+                    && $conditional->getOperatorType() == Conditional::OPERATOR_NOTCONTAINS
+                    && $conditional->getText() !== null) {
+                    $objWriter->writeElement('formula', 'ISERROR(SEARCH("' . $conditional->getText() . '",' . $cellCoordinate . '))');
+                } elseif ($conditional->getConditionType() == Conditional::CONDITION_CELLIS
+                    || $conditional->getConditionType() == Conditional::CONDITION_CONTAINSTEXT
+                    || $conditional->getConditionType() == Conditional::CONDITION_EXPRESSION) {
+                    foreach ($conditional->getConditions() as $formula) {
+                        // Formula
+                        $objWriter->writeElement('formula', $formula);
+                    }
+                } elseif ($conditional->getConditionType() == Conditional::CONDITION_CONTAINSBLANKS) {
+                    // formula copied from ms xlsx xml source file
+                    $objWriter->writeElement('formula', 'LEN(TRIM(' . $cellCoordinate . '))=0');
+                }
+
+                $objWriter->endElement();
+
+                $objWriter->endElement();
             }
         }
     }
